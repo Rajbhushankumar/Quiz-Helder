@@ -116,10 +116,26 @@ body.stream .top{font-size:clamp(18px,3vw,24px)}
     </div>
     <div class="row">
       <button class="btn" id="start">🚀 Start quiz</button>
+      <button class="btn ghost" id="share">🔗 Create share link</button>
       <button class="btn ghost" id="sample">✨ Load sample</button>
       <button class="btn ghost" id="clear">🗑️ Clear</button>
     </div>
     <p class="err" id="err" role="alert"></p>
+    <div id="sharebox" class="hide" style="margin-top:12px">
+      <label for="slink">🔗 Link for your participants</label>
+      <input type="text" id="slink" readonly>
+      <div class="row"><button class="btn" id="copylink">📋 Copy link</button></div>
+      <p class="hint" id="snote">Participants who open this link see only the quiz, not this maker page.</p>
+    </div>
+  </div>
+</section>
+
+<section id="welcome" class="hide">
+  <div class="card" style="text-align:center">
+    <div class="big pop">🎉</div>
+    <div class="brand"><div class="ch" id="wchan"></div><div class="tt" id="wtitle"></div></div>
+    <p class="sub" id="winfo"></p>
+    <button class="btn" id="wstart">🚀 Start quiz</button>
   </div>
 </section>
 
@@ -127,6 +143,7 @@ body.stream .top{font-size:clamp(18px,3vw,24px)}
   <div class="brand" id="brand1"></div>
   <div class="top"><span id="prog">1 / 5</span><span id="tsec"></span><span id="sc">⭐ 0</span><button class="btn ghost" id="snd" style="padding:0 12px;min-height:36px" aria-label="Sound on or off">🔊</button></div>
   <div class="bar"><i id="fill"></i></div>
+  <p class="sub" id="mot" style="text-align:center;margin:0 0 12px;font-weight:600;min-height:1.5em"></p>
   <div class="card">
     <div class="tbar hide" id="tbar"><i id="tfill"></i></div>
     <div class="badge hide" id="badge"></div>
@@ -164,7 +181,7 @@ body.stream .top{font-size:clamp(18px,3vw,24px)}
 (function(){
 var $=function(i){return document.getElementById(i)};
 var SAMPLE="🇯🇵 What is the capital of Japan? | Tokyo 🗼\n🐘 Which animal never forgets, says the saying? | Elephant\n🌍 Which planet do we live on? | Earth\n🍎 Which fruit is said to keep the doctor away? | Apple\n🧊 What is frozen water called? | Ice\n🐝 Which insect makes honey? | Bee 🍯";
-var mode="mc",items=[],order=[],i=0,score=0,locked=false,missed=[],streak=0,results=[],tm=null,limit=0,share="",pts=0,used50=false,skipsLeft=3,at=null,ac=null,snd=true,W={easy:1,medium:2,hard:3};
+var mode="mc",items=[],order=[],i=0,score=0,locked=false,missed=[],streak=0,results=[],tm=null,limit=0,share="",pts=0,used50=false,skipsLeft=3,at=null,ac=null,snd=true,player=false,W={easy:1,medium:2,hard:3};
 
 function parse(t){
   var out=[],lines=t.split(/\r?\n/);
@@ -192,7 +209,7 @@ function brand(){
     el.querySelector(".tt").textContent="🎬 "+(t||"Quiz Time")+" 🎯";
   });
   var ct=$("ctain").value.trim();$("cta").textContent=ct||(c?"👍 Like · 🔔 Subscribe · 💬 Comment your score on "+c+"! 🎉":"👍 Like · 🔔 Subscribe · 💬 Comment your score! 🎉");
-  try{localStorage.setItem("qm_chan",c);localStorage.setItem("qm_cta",ct)}catch(e){}
+  if(!player)try{localStorage.setItem("qm_chan",c);localStorage.setItem("qm_cta",ct)}catch(e){}
 }
 function rain(list){
   for(var n=0;n<24;n++){var d=document.createElement("span");d.className="rain";
@@ -200,7 +217,7 @@ function rain(list){
     d.style.animationDuration=(2+Math.random()*2.5)+"s";d.style.animationDelay=(Math.random()*.8)+"s";
     document.body.appendChild(d);(function(x){setTimeout(function(){x.remove()},5500)})(d);}
 }
-function show(id){["setup","play","done"].forEach(function(s){$(s).classList.toggle("hide",s!==id)});window.scrollTo(0,0)}
+function show(id){["setup","play","done","welcome"].forEach(function(s){$(s).classList.toggle("hide",s!==id)});window.scrollTo(0,0)}
 function setMode(m){mode=m;$("m-mc").setAttribute("aria-pressed",m==="mc");$("m-ty").setAttribute("aria-pressed",m==="ty")}
 
 $("m-mc").onclick=function(){setMode("mc")};
@@ -213,7 +230,7 @@ var TH=["","#E5254B","#0E9F6E","#1E6BFF","#E8590C","#C026D3"];
 function setTheme(c){var r=document.documentElement.style;
   if(c){r.setProperty("--acc",c);r.setProperty("--accfg","#fff")}else{r.removeProperty("--acc");r.removeProperty("--accfg")}
   Array.prototype.forEach.call($("sw").children,function(b){b.setAttribute("aria-pressed",b.dataset.c===c)});
-  try{localStorage.setItem("qm_th",c)}catch(e){}}
+  try{if(!player)localStorage.setItem("qm_th",c)}catch(e){}}
 TH.forEach(function(c){var b=document.createElement("button");b.dataset.c=c;b.style.background=c||"#5B3DF5";
   b.setAttribute("aria-label","Theme color");b.onclick=function(){setTheme(c)};$("sw").appendChild(b)});
 $("copy").onclick=function(){var b=this;
@@ -263,6 +280,8 @@ function render(){
   bg.textContent=bd||"";bg.classList.toggle("hide",!bd);
   $("ll5").disabled=used50;$("ll5").classList.toggle("hide",mode!=="mc");$("llskip").disabled=skipsLeft<=0;$("llskip").textContent="⏭️ Skip ("+skipsLeft+")";
   $("prog").textContent="Question "+(i+1)+" / "+order.length;
+  var L=order.length,ms=["💡 Think it through!","🎯 Stay focused!","🌟 You're doing great!","💪 Keep the energy up!","🚀 Nice pace, keep going!","✨ Trust yourself!"];
+  $("mot").textContent=i===0?"🎯 Let's go! You've got this! 💪":i===L-1&&L>1?"🏁 Final question! Finish strong! 🔥":(L>=4&&i===Math.floor(L/2))?"🔥 Halfway there! Keep it up!":ms[i%ms.length];
   scoreTxt();
   $("fill").style.width=(i/order.length*100)+"%";
   $("qtext").textContent=it.q;
@@ -306,6 +325,7 @@ function feedback(right,given){
   else{missed.push({q:it.q,a:it.a,g:given});f.textContent=(given.indexOf("⏰")===0?"⏰ Time's up!":"😅 Not quite.")+" Answer: "+it.a}
   f.className="fb show "+(right?"ok":"bad");
   if(right&&streak>=3)f.textContent="🔥 "+streak+" in a row! Unstoppable!";
+  if(!right)f.textContent+="\n"+pick1(["💪 Keep going, you've got this!","🌱 Every mistake is a step forward!","🚀 The next one is yours!","✨ Don't give up, you're learning!"]);
   if(it.f)f.textContent+="\n💡 "+it.f;
   sfx(right?"ok":"bad");$("ll5").disabled=true;$("llskip").disabled=true;
   clearTimeout(at);if($("auto").value==="1")at=setTimeout(function(){$("next").click()},it.f?4500:3000);
@@ -321,7 +341,7 @@ function finish(){
   $("fill").style.width="100%";
   var pct=Math.round(score/order.length*100);
   var e=pct===100?"🏆":pct>=80?"🎉":pct>=60?"😄":pct>=40?"🙂":"💪";
-  var m=pct===100?"Perfect score! 🌟":pct>=80?"Excellent work!":pct>=60?"Good job, keep going!":pct>=40?"Not bad. Try again to beat it!":"Practice makes progress. Give it another go!";
+  var m=pct===100?"Perfect score! You're a quiz legend! 🌟👑":pct>=80?"Excellent work! You're on fire! 🔥":pct>=60?"Great job! A little more and you'll be a champion! 💪":pct>=40?"Good effort! Every try makes you better. Play again and beat your score! 🚀":"Don't worry! Every expert started here. Try again, you've got this! 🌱💪";
   var c=$("chan").value.trim(),t=$("title").value.trim();
   share="🎬 "+(t||"Quiz")+"\n🏆 "+score+"/"+order.length+" ("+pct+"%) ⭐ "+pts+" pts\n"+results.join("")+(c?"\n📺 "+c:"");
   $("trophy").textContent=e;$("final").textContent=score+" / "+order.length+" ("+pct+"%) · ⭐ "+pts+" pts";$("msg").textContent=m;
@@ -346,6 +366,46 @@ $("src").value=SAMPLE;
 try{$("chan").value=localStorage.getItem("qm_chan")||"";$("ctain").value=localStorage.getItem("qm_cta")||""}catch(e){}
 try{setTheme(localStorage.getItem("qm_th")||"")}catch(e){setTheme("")}
 updDet();
+
+function b64e(u){var t="";for(var k=0;k<u.length;k++)t+=String.fromCharCode(u[k]);return btoa(t).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function b64d(t){t=t.replace(/-/g,"+").replace(/_/g,"/");while(t.length%4)t+="=";var r=atob(t),u=new Uint8Array(r.length);for(var k=0;k<r.length;k++)u[k]=r.charCodeAt(k);return u}
+async function pack(o){var u=new TextEncoder().encode(JSON.stringify(o));
+  try{var z=new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());return "z"+b64e(z)}catch(e){return "p"+b64e(u)}}
+async function unpack(t){var u=b64d(t.slice(1));
+  if(t.charAt(0)==="z")u=new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+  return JSON.parse(new TextDecoder().decode(u))}
+
+$("share").onclick=async function(){
+  var list=parse($("src").value),u={};list.forEach(function(x){u[norm(x.a)]=1});
+  if(list.length<2){$("err").textContent="⚠️ Add at least 2 lines like: Question | Answer";return}
+  if(mode==="mc"&&Object.keys(u).length<3){$("err").textContent="⚠️ Multiple choice needs at least 3 different answers. Add more lines or pick Type answer.";return}
+  $("err").textContent="";
+  var o={t:$("title").value.trim(),c:$("chan").value.trim(),x:$("ctain").value.trim(),m:mode,tm:$("tmr").value,n:$("cnt").value,a:$("auto").value,s:$("stream").value,
+    th:document.documentElement.style.getPropertyValue("--acc").trim(),
+    i:list.map(function(x){return [x.q,x.a,x.f||"",x.d||""]})};
+  var url=location.href.split("#")[0]+"#q="+await pack(o);
+  $("slink").value=url;$("sharebox").classList.remove("hide");
+  $("snote").textContent=url.length>6000?"⚠️ This link is very long. If it fails to open in some apps, use fewer questions.":"Participants who open this link see only the quiz, not this maker page.";
+  $("slink").focus();$("slink").select();
+};
+$("copylink").onclick=function(){var b=this,t=$("slink").value;
+  function ok(){b.textContent="✅ Copied!";setTimeout(function(){b.textContent="📋 Copy link"},1800)}
+  function old(){$("slink").select();try{document.execCommand("copy");ok()}catch(e){}}
+  try{navigator.clipboard.writeText(t).then(ok,old)}catch(e){old()}};
+$("wstart").onclick=function(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}begin()};
+(async function(){
+  if(location.hash.indexOf("#q=")!==0)return;
+  var o;try{o=await unpack(location.hash.slice(3))}catch(e){return}
+  player=true;
+  items=o.i.map(function(a){return{q:a[0],a:a[1],f:a[2],d:a[3]}});
+  setMode(o.m);$("title").value=o.t||"";$("chan").value=o.c||"";$("ctain").value=o.x||"";
+  $("tmr").value=o.tm;$("cnt").value=o.n;$("auto").value=o.a;$("stream").value=o.s;setTheme(o.th||"");
+  $("edit").classList.add("hide");document.title=o.t||"Quiz";
+  $("wtitle").textContent="🎬 "+(o.t||"Quiz Time")+" 🎯";$("wchan").textContent=o.c?"📺 "+o.c:"";
+  var n=Math.min(items.length,parseInt(o.n,10)||items.length),tm=parseInt(o.tm,10)||0;
+  $("winfo").textContent="📝 "+n+" questions"+(tm?"  ·  ⏱️ "+tm+"s each":"");
+  show("welcome");
+})();
 })();
 </script>
 </body>
